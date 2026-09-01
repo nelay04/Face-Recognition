@@ -1,0 +1,62 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+ENV/
+
+# ---- Tooling caches ----
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# ---- Secrets & local config ----
+.env
+.env.*
+!.env.example
+
+# ---- Face data (never commit biometric data) ----
+# Enrolment photos and derived embeddings are personal data.
+data/known_faces/*
+data/encodings/*
+!data/known_faces/.gitkeep
+!data/encodings/.gitkeep
+
+# Stray media anywhere in the tree
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.webp
+*.mp4
+*.avi
+*.mov
+*.pkl
+*.npy
+# ...except intentional documentation assets
+!docs/assets/**
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
