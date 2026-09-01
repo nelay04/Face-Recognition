@@ -1,0 +1,10 @@
+# Development and CI dependencies.
+-r base.txt
+
+pytest==9.0.1
+pytest-cov==7.0.0
+pytest-asyncio==1.3.0
+httpx==0.28.1          # FastAPI TestClient transport
+ruff==0.14.6           # lint + format
+mypy==1.19.0
+pre-commit==4.4.0
