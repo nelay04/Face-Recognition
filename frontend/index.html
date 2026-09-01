@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Face Recognition</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>Face Recognition</h1>
+        <p class="subtitle">Service status</p>
+      </div>
+    </header>
+
+    <section class="card" aria-live="polite">
+      <div class="status">
+        <span class="dot" id="dot" data-state="pending"></span>
+        <span class="status-text" id="status-text">Checking…</span>
+      </div>
+
+      <dl class="meta" id="meta" hidden>
+        <div><dt>Service</dt><dd id="meta-app">—</dd></div>
+        <div><dt>Version</dt><dd id="meta-version">—</dd></div>
+        <div><dt>Environment</dt><dd id="meta-env">—</dd></div>
+        <div><dt>Readiness</dt><dd id="meta-ready">—</dd></div>
+      </dl>
+
+      <button class="btn" id="refresh" type="button">Refresh</button>
+    </section>
+
+    <footer class="footer">
+      <a href="/docs">API documentation</a>
+    </footer>
+  </main>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
