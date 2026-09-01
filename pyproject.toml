@@ -1,0 +1,49 @@
+[project]
+name = "face-recognition-service"
+version = "0.1.0"
+description = "A FastAPI face recognition service with a browser front end."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+
+# Runtime dependencies are pinned in requirements/base.txt, which also carries
+# the install-order constraints that pip metadata cannot express.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["backend", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "N",        # pep8-naming
+    "UP",       # pyupgrade
+    "B",        # bugbear
+    "SIM",      # simplify
+    "RUF",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["backend"]
+strict = true
+warn_unused_ignores = true
+
+# These ship no type stubs.
+[[tool.mypy.overrides]]
+module = ["face_recognition.*", "cv2.*", "dlib.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --cov=backend --cov-report=term-missing"
+asyncio_mode = "auto"
