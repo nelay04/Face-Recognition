@@ -3,8 +3,8 @@
 A face recognition service: a **FastAPI** backend that enrols and identifies faces, and a
 lightweight browser front end that streams webcam frames to it and draws the results.
 
-> **Status:** enrolment and recognition work end to end over HTTP. The browser UI is a
-> status dashboard for now; live webcam capture is next.
+> **Status:** working end to end — live webcam recognition in the browser, backed by a
+> FastAPI enrolment and recognition API.
 
 ---
 
@@ -13,6 +13,7 @@ lightweight browser front end that streams webcam frames to it and draws the res
 - [Architecture](#architecture)
 - [Project layout](#project-layout)
 - [Getting started](#getting-started)
+- [Performance](#performance)
 - [Configuration](#configuration)
 - [API](#api)
 - [Development](#development)
@@ -68,7 +69,10 @@ Two conventions are worth knowing:
 │   ├── schemas/             # common, face, recognition
 │   ├── services/            # encoder, gallery, recognizer
 │   └── utils/               # image decoding
-├── frontend/                # static UI: index.html + css/ + js/
+├── frontend/                # static UI
+│   ├── index.html
+│   ├── css/styles.css
+│   └── js/                  # api, camera, overlay, app
 ├── data/                    # gallery.db (gitignored)
 ├── tests/                   # unit/ and integration/
 ├── scripts/                 # setup.sh (bootstrap), dev.sh (run)
@@ -99,6 +103,17 @@ uvicorn backend.app.main:app --reload
 The UI is served at <http://127.0.0.1:8000> and the interactive API docs at
 <http://127.0.0.1:8000/docs>.
 
+### Using it
+
+1. **Enrol** — type a name, then either *Capture from camera* or *Upload a photo*.
+   The photo must contain exactly one face.
+2. **Start camera** — frames are sent to `/recognize` and boxes are drawn over the video.
+   Green is a match, amber is `Unknown`.
+3. **Remove** anyone from the *Enrolled* list with the × button.
+
+Browsers only grant camera access over HTTPS or on `localhost`, so use `127.0.0.1` rather
+than a LAN address when testing.
+
 ### About the dependency install
 
 `face_recognition` and its model package are unmaintained and have two metadata problems that
@@ -116,6 +131,30 @@ pip install -r requirements/base.txt
 pip install --no-deps face-recognition==1.3.0
 ```
 
+## Performance
+
+Detection cost scales with pixel count, so a phone photo can take seconds while a webcam
+frame takes milliseconds. Images are therefore shrunk so their longest edge is at most
+`DETECTION_MAX_EDGE` (640px) before detection, and bounding boxes are scaled back to source
+coordinates before they are returned. Measured on the same three images:
+
+| Image | Uncapped | Capped at 640 |
+| --- | --- | --- |
+| 2592×4608 | 4548 ms | **189 ms** |
+| 1650×1650 | 1355 ms | **258 ms** |
+| 474×315 | 133 ms | 122 ms (below the cap, untouched) |
+
+Accuracy is unaffected: the same-person distance stayed at 0.321 and different-person at
+0.96, against a 0.6 tolerance.
+
+Capping the *longest edge* is deliberate rather than scaling by a fixed ratio — a fixed ratio
+either leaves large images slow or shrinks small ones until their faces disappear. Embeddings
+are computed from the same downscaled frame during both enrolment and recognition, so
+distances stay comparable.
+
+The browser also caps captured frames at 640px and sends the next frame only once the
+previous response arrives, so a slow server lowers the frame rate instead of queueing work.
+
 ## Configuration
 
 All settings are environment variables, read once into a typed object in `core/config.py`.
@@ -130,6 +169,7 @@ See [`.env.example`](.env.example) for the full list. The ones worth tuning:
 | `MATCH_TOLERANCE` | `0.6` | Distance below which two faces are the same person. Lower is stricter. |
 | `DETECTION_MODEL` | `hog` | `hog` (CPU, fast) or `cnn` (GPU, accurate). |
 | `DETECTION_UPSAMPLE` | `1` | Higher finds smaller faces, costs time. |
+| `DETECTION_MAX_EDGE` | `640` | Shrink to this before detecting; `0` disables. |
 | `GALLERY_DB_PATH` | `data/gallery.db` | SQLite file holding enrolled identities. |
 | `MAX_UPLOAD_BYTES` | `5242880` | Rejects oversized uploads. |
 
