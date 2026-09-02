@@ -37,6 +37,54 @@ class ServiceUnavailableError(AppError):
     message = "The service is not ready to accept traffic."
 
 
+class InvalidImageError(AppError):
+    """The upload could not be decoded as a usable image."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    code = "invalid_image"
+    message = "The uploaded file is not a readable image."
+
+
+class PayloadTooLargeError(AppError):
+    """The upload exceeds the configured size limit."""
+
+    status_code = status.HTTP_413_CONTENT_TOO_LARGE
+    code = "payload_too_large"
+    message = "The uploaded file is too large."
+
+
+class NoFaceDetectedError(AppError):
+    """Enrolment needs exactly one face and found none."""
+
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    code = "no_face_detected"
+    message = "No face was found in the image."
+
+
+class MultipleFacesError(AppError):
+    """Enrolment needs exactly one face and found several."""
+
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    code = "multiple_faces"
+    message = "The image contains more than one face; enrol a single face."
+
+
+class IdentityExistsError(AppError):
+    """An identity is already enrolled under that name."""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "identity_exists"
+    message = "An identity with that name is already enrolled."
+
+
+class IdentityNotFoundError(AppError):
+    """No identity is enrolled under that name."""
+
+    status_code = status.HTTP_404_NOT_FOUND
+    code = "identity_not_found"
+    message = "No identity with that name is enrolled."
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Attach handlers that render errors as :class:`ErrorResponse`."""
 
