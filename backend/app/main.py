@@ -16,6 +16,9 @@ from backend.app.api.v1.router import api_router
 from backend.app.core.config import Settings, get_settings
 from backend.app.core.exceptions import register_exception_handlers
 from backend.app.core.logging import configure_logging
+from backend.app.services.encoder import FaceEncoder
+from backend.app.services.gallery import FaceGallery
+from backend.app.services.recognizer import Recognizer
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +28,27 @@ FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Run startup and shutdown work once per process."""
+    """Run startup and shutdown work once per process.
+
+    The encoder loads ~100 MB of model weights, so it is built here and shared
+    across requests rather than constructed per call.
+    """
     settings: Settings = app.state.settings
     logger.info("Starting %s v%s (%s)", settings.app_name, settings.version, settings.environment)
+
+    app.state.encoder = FaceEncoder(
+        model=settings.detection_model,
+        upsample=settings.detection_upsample,
+    )
+    app.state.gallery = FaceGallery(settings.gallery_db_path)
+    app.state.recognizer = Recognizer(
+        app.state.gallery,
+        tolerance=settings.match_tolerance,
+    )
+    logger.info("Loaded recognition services (%d enrolled)", app.state.gallery.count())
+
     yield
+
     logger.info("Shutdown complete")
 
 
