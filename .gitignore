@@ -30,11 +30,16 @@ coverage.xml
 !.env.example
 
 # ---- Face data (never commit biometric data) ----
-# Enrolment photos and derived embeddings are personal data.
-data/known_faces/*
-data/encodings/*
-!data/known_faces/.gitkeep
-!data/encodings/.gitkeep
+# Everything the app writes at runtime lands under data/: enrolment photos,
+# the SQLite gallery and its WAL sidecars. Face embeddings are personal data
+# and are as identifying as the photo they came from, so the whole directory
+# is ignored rather than named file by file. The app creates it on startup.
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
 
 # Stray media anywhere in the tree
 *.jpg
