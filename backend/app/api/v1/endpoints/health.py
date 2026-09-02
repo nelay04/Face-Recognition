@@ -6,7 +6,8 @@ import logging
 
 from fastapi import APIRouter, Response, status
 
-from backend.app.api.deps import EncoderDep, GalleryDep, SettingsDep
+from backend.app.api.deps import DeviceDep, EncoderDep, GalleryDep, SettingsDep
+from backend.app.core.device import DeviceChoice
 from backend.app.schemas.common import (
     HealthResponse,
     ReadinessCheck,
@@ -48,8 +49,9 @@ async def readiness(
     response: Response,
     encoder: EncoderDep,
     gallery: GalleryDep,
+    device: DeviceDep,
 ) -> ReadinessResponse:
-    checks = _run_checks(encoder, gallery)
+    checks = _run_checks(encoder, gallery, device)
     ready = all(check.ready for check in checks)
 
     if not ready:
@@ -58,7 +60,11 @@ async def readiness(
     return ReadinessResponse(ready=ready, checks=checks)
 
 
-def _run_checks(encoder: FaceEncoder, gallery: FaceGallery) -> list[ReadinessCheck]:
+def _run_checks(
+    encoder: FaceEncoder,
+    gallery: FaceGallery,
+    device: DeviceChoice,
+) -> list[ReadinessCheck]:
     """Probe each dependency the service needs to answer requests.
 
     Each probe is exercised for real rather than assumed: the gallery check
@@ -67,17 +73,21 @@ def _run_checks(encoder: FaceEncoder, gallery: FaceGallery) -> list[ReadinessChe
     """
     return [
         ReadinessCheck(name="configuration", ready=True),
-        _check_encoder(encoder),
+        _check_encoder(encoder, device),
         _check_gallery(gallery),
     ]
 
 
-def _check_encoder(encoder: FaceEncoder) -> ReadinessCheck:
+def _check_encoder(encoder: FaceEncoder, device: DeviceChoice) -> ReadinessCheck:
     ready = encoder is not None
+    # The device is reported here rather than in its own check because it
+    # cannot fail independently: resolution either succeeded at startup or the
+    # process never came up. It is worth surfacing because "is this actually
+    # on the GPU?" is otherwise unanswerable without reading the logs.
     return ReadinessCheck(
         name="encoder",
         ready=ready,
-        detail="model loaded" if ready else "model not loaded",
+        detail=f"model loaded on {device}" if ready else "model not loaded",
     )
 
 

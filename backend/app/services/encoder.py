@@ -19,7 +19,7 @@ import face_recognition
 import numpy as np
 from numpy.typing import NDArray
 
-from backend.app.core.config import DetectionModel
+from backend.app.core.config import DetectionModel, EncodingModel
 from backend.app.core.exceptions import MultipleFacesError, NoFaceDetectedError
 from backend.app.utils.image import RgbImage
 
@@ -74,10 +74,16 @@ class FaceEncoder:
         model: DetectionModel = "hog",
         upsample: int = 1,
         max_edge: int = 640,
+        encoding_model: EncodingModel = "large",
+        jitters: int = 1,
+        enrolment_jitters: int = 10,
     ) -> None:
         self._model = model
         self._upsample = upsample
         self._max_edge = max_edge
+        self._encoding_model = encoding_model
+        self._jitters = jitters
+        self._enrolment_jitters = enrolment_jitters
 
     def detect(self, image: RgbImage) -> list[BoundingBox]:
         """Locate every face in ``image``, in source-image coordinates."""
@@ -85,8 +91,11 @@ class FaceEncoder:
         locations = self._locate(working)
         return [_to_box(location, scale) for location in locations]
 
-    def encode(self, image: RgbImage) -> list[DetectedFace]:
+    def encode(self, image: RgbImage, *, jitters: int | None = None) -> list[DetectedFace]:
         """Detect and describe every face in ``image``.
+
+        ``jitters`` overrides the configured averaging count for this call;
+        enrolment spends more here than live recognition does.
 
         Returns an empty list when the image contains no faces; that is a
         normal outcome for recognition, so it is not treated as an error here.
@@ -100,7 +109,12 @@ class FaceEncoder:
         # Embeddings come from the downscaled frame too, so that enrolment and
         # recognition always describe faces at the same working resolution and
         # their distances stay comparable.
-        embeddings = face_recognition.face_encodings(working, known_face_locations=locations)
+        embeddings = face_recognition.face_encodings(
+            working,
+            known_face_locations=locations,
+            num_jitters=self._jitters if jitters is None else jitters,
+            model=self._encoding_model,
+        )
 
         return [
             DetectedFace(
@@ -148,17 +162,22 @@ class FaceEncoder:
         )
         return cast(RgbImage, resized), scale
 
-    def encode_single(self, image: RgbImage) -> DetectedFace:
+    def encode_single(self, image: RgbImage, *, jitters: int | None = None) -> DetectedFace:
         """Describe the one face in ``image``, for enrolment.
 
         Enrolment is deliberately strict: a photo with two people is ambiguous
         about who is being enrolled, so it is rejected rather than guessed at.
 
+        Enrolment also averages over more jittered crops than a live frame
+        can afford: it runs once, and every later match is measured against
+        the embedding it produces, so a noisy reference costs accuracy
+        forever.
+
         Raises:
             NoFaceDetectedError: the image contains no face.
             MultipleFacesError: the image contains more than one face.
         """
-        faces = self.encode(image)
+        faces = self.encode(image, jitters=self._enrolment_jitters if jitters is None else jitters)
 
         if not faces:
             raise NoFaceDetectedError()

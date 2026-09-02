@@ -59,6 +59,10 @@ data/
 *.log
 logs/
 
+# ---- Downloaded installers ----
+*.deb
+*.rpm
+
 # ---- OS / editor ----
 .DS_Store
 Thumbs.db

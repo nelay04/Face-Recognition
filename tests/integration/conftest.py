@@ -40,11 +40,13 @@ class StubEncoder:
 
     def __init__(self, faces: list[DetectedFace]) -> None:
         self.faces = faces
+        # encode_single borrows the real implementation, which reads this.
+        self._enrolment_jitters = 1
 
-    def encode(self, _image: object) -> list[DetectedFace]:
+    def encode(self, _image: object, *, jitters: int | None = None) -> list[DetectedFace]:
         return list(self.faces)
 
-    def encode_single(self, image: object) -> DetectedFace:
+    def encode_single(self, image: object, *, jitters: int | None = None) -> DetectedFace:
         # Reuse the real guard clauses so their error mapping is exercised.
         return FaceEncoder.encode_single(self, image)  # type: ignore[arg-type]
 

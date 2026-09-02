@@ -12,6 +12,8 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 Environment = Literal["development", "staging", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 DetectionModel = Literal["hog", "cnn"]
+EncodingModel = Literal["small", "large"]
+ComputeDevice = Literal["auto", "gpu", "cpu"]
 
 
 class Settings(BaseSettings):
@@ -34,14 +36,14 @@ class Settings(BaseSettings):
     environment: Environment = "development"
 
     host: str = "127.0.0.1"
-    port: int = Field(default=8000, ge=1, le=65535)
+    port: int = Field(default=8013, ge=1, le=65535)
     log_level: LogLevel = "INFO"
 
     # NoDecode stops pydantic-settings from JSON-decoding this env var before
     # our own validator runs — without it, a plain comma-separated string
     # fails with a JSONDecodeError instead of reaching `_split_origins`.
     cors_origins: Annotated[list[str], NoDecode] = Field(
-        default_factory=lambda: ["http://127.0.0.1:8000"]
+        default_factory=lambda: ["http://127.0.0.1:8013"]
     )
 
     # ---- Uploads ----
@@ -55,13 +57,32 @@ class Settings(BaseSettings):
     # Euclidean distance below which two embeddings are the same person.
     # 0.6 is dlib's published operating point for this model.
     match_tolerance: float = Field(default=0.6, gt=0.0, le=1.0)
-    detection_model: DetectionModel = "hog"
+    # Where detection runs. "auto" uses the GPU when the installed dlib was
+    # built with CUDA and a device is visible, and quietly falls back to the
+    # CPU otherwise; "gpu" refuses to start rather than fall back, so a
+    # misconfigured deployment is caught instead of silently crawling.
+    compute_device: ComputeDevice = "auto"
+    # Explicit detector, overriding whatever COMPUTE_DEVICE would have chosen.
+    # Left unset, it follows the device: cnn on GPU, hog on CPU.
+    detection_model: DetectionModel | None = None
     # Times to upsample before detecting. Higher finds smaller faces, costs time.
     detection_upsample: int = Field(default=1, ge=0, le=4)
     # Images are shrunk so their longest edge is at most this, before
     # detection. Detection cost scales with pixel count, so this bounds
     # per-frame latency regardless of the camera or photo resolution.
     detection_max_edge: int = Field(default=640, ge=0)
+    # Landmark model used to align a face before describing it. "large" uses
+    # 68 points instead of 5, so the crop it feeds dlib is better centred and
+    # rotated; same-person distances shrink as a result. It must match between
+    # enrolment and recognition or the two are not comparable.
+    encoding_model: EncodingModel = "large"
+    # Times to re-describe a face with small random distortions, averaging the
+    # results. Averaging cancels noise from a single unlucky crop, at a linear
+    # cost in time — hence a cheap default for live frames and a generous one
+    # for enrolment, which happens once and sets the reference every later
+    # match is measured against.
+    encoding_jitters: int = Field(default=1, ge=1, le=100)
+    enrolment_jitters: int = Field(default=10, ge=1, le=100)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

@@ -54,7 +54,7 @@ def test_encode_single_rejects_multiple_faces(monkeypatch: pytest.MonkeyPatch) -
             embedding=np.zeros(EMBEDDING_DIM),
         )
     ] * 2
-    monkeypatch.setattr(encoder, "encode", lambda _: two_faces)
+    monkeypatch.setattr(encoder, "encode", lambda _, **_kwargs: two_faces)
 
     with pytest.raises(MultipleFacesError):
         encoder.encode_single(blank_image())
@@ -66,7 +66,7 @@ def test_encode_single_returns_the_only_face(monkeypatch: pytest.MonkeyPatch) ->
         box=BoundingBox(top=1, right=2, bottom=3, left=4),
         embedding=np.zeros(EMBEDDING_DIM),
     )
-    monkeypatch.setattr(encoder, "encode", lambda _: [only])
+    monkeypatch.setattr(encoder, "encode", lambda _, **_kwargs: [only])
 
     assert encoder.encode_single(blank_image()) is only
 

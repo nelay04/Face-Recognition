@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.v1.router import api_router
 from backend.app.core.config import Settings, get_settings
+from backend.app.core.device import resolve as resolve_device
 from backend.app.core.exceptions import register_exception_handlers
 from backend.app.core.logging import configure_logging
 from backend.app.services.encoder import FaceEncoder
@@ -36,10 +37,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
     logger.info("Starting %s v%s (%s)", settings.app_name, settings.version, settings.environment)
 
+    # Resolved once at startup, not per request: probing CUDA is cheap but the
+    # answer cannot change while the process runs, and the log line below is
+    # the only place anyone finds out where detection is actually running.
+    device = resolve_device(settings.compute_device, override=settings.detection_model)
+    logger.info("Detection running on %s", device)
+    app.state.device = device
+
     app.state.encoder = FaceEncoder(
-        model=settings.detection_model,
+        model=device.detection_model,
         upsample=settings.detection_upsample,
         max_edge=settings.detection_max_edge,
+        encoding_model=settings.encoding_model,
+        jitters=settings.encoding_jitters,
+        enrolment_jitters=settings.enrolment_jitters,
     )
     app.state.gallery = FaceGallery(settings.gallery_db_path)
     app.state.recognizer = Recognizer(
