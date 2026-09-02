@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Response, status
 
-from backend.app.api.deps import SettingsDep
+from backend.app.api.deps import EncoderDep, GalleryDep, SettingsDep
 from backend.app.schemas.common import (
     HealthResponse,
     ReadinessCheck,
     ReadinessResponse,
 )
+from backend.app.services.encoder import FaceEncoder
+from backend.app.services.gallery import FaceGallery
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -38,8 +44,12 @@ async def health(settings: SettingsDep) -> HealthResponse:
     ),
     responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ReadinessResponse}},
 )
-async def readiness(response: Response) -> ReadinessResponse:
-    checks = _run_checks()
+async def readiness(
+    response: Response,
+    encoder: EncoderDep,
+    gallery: GalleryDep,
+) -> ReadinessResponse:
+    checks = _run_checks(encoder, gallery)
     ready = all(check.ready for check in checks)
 
     if not ready:
@@ -48,10 +58,38 @@ async def readiness(response: Response) -> ReadinessResponse:
     return ReadinessResponse(ready=ready, checks=checks)
 
 
-def _run_checks() -> list[ReadinessCheck]:
+def _run_checks(encoder: FaceEncoder, gallery: FaceGallery) -> list[ReadinessCheck]:
     """Probe each dependency the service needs to answer requests.
 
-    Only configuration is checked today. Recognition-model loading and gallery
-    availability join this list when those features land.
+    Each probe is exercised for real rather than assumed: the gallery check
+    runs a query, so a missing or corrupt database surfaces here instead of on
+    the first recognition request.
     """
-    return [ReadinessCheck(name="configuration", ready=True)]
+    return [
+        ReadinessCheck(name="configuration", ready=True),
+        _check_encoder(encoder),
+        _check_gallery(gallery),
+    ]
+
+
+def _check_encoder(encoder: FaceEncoder) -> ReadinessCheck:
+    ready = encoder is not None
+    return ReadinessCheck(
+        name="encoder",
+        ready=ready,
+        detail="model loaded" if ready else "model not loaded",
+    )
+
+
+def _check_gallery(gallery: FaceGallery) -> ReadinessCheck:
+    try:
+        count = gallery.count()
+    except Exception as exc:  # Any failure here means "not ready".
+        logger.warning("Gallery readiness check failed: %s", exc)
+        return ReadinessCheck(name="gallery", ready=False, detail=str(exc))
+
+    return ReadinessCheck(
+        name="gallery",
+        ready=True,
+        detail=f"{count} identities enrolled",
+    )
