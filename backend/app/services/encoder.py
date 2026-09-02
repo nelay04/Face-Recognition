@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import cast
 
+import cv2
 import face_recognition
 import numpy as np
 from numpy.typing import NDArray
@@ -71,18 +73,17 @@ class FaceEncoder:
         *,
         model: DetectionModel = "hog",
         upsample: int = 1,
+        max_edge: int = 640,
     ) -> None:
         self._model = model
         self._upsample = upsample
+        self._max_edge = max_edge
 
     def detect(self, image: RgbImage) -> list[BoundingBox]:
-        """Locate every face in ``image``."""
-        locations = face_recognition.face_locations(
-            image,
-            number_of_times_to_upsample=self._upsample,
-            model=self._model,
-        )
-        return [BoundingBox(top=t, right=r, bottom=b, left=lft) for t, r, b, lft in locations]
+        """Locate every face in ``image``, in source-image coordinates."""
+        working, scale = self._downscale(image)
+        locations = self._locate(working)
+        return [_to_box(location, scale) for location in locations]
 
     def encode(self, image: RgbImage) -> list[DetectedFace]:
         """Detect and describe every face in ``image``.
@@ -90,23 +91,62 @@ class FaceEncoder:
         Returns an empty list when the image contains no faces; that is a
         normal outcome for recognition, so it is not treated as an error here.
         """
-        locations = face_recognition.face_locations(
+        working, scale = self._downscale(image)
+
+        locations = self._locate(working)
+        if not locations:
+            return []
+
+        # Embeddings come from the downscaled frame too, so that enrolment and
+        # recognition always describe faces at the same working resolution and
+        # their distances stay comparable.
+        embeddings = face_recognition.face_encodings(working, known_face_locations=locations)
+
+        return [
+            DetectedFace(
+                box=_to_box(location, scale),
+                embedding=np.asarray(embedding, dtype=np.float64),
+            )
+            for location, embedding in zip(locations, embeddings, strict=True)
+        ]
+
+    def _locate(self, image: RgbImage) -> list[tuple[int, int, int, int]]:
+        locations: list[tuple[int, int, int, int]] = face_recognition.face_locations(
             image,
             number_of_times_to_upsample=self._upsample,
             model=self._model,
         )
-        if not locations:
-            return []
+        return locations
 
-        embeddings = face_recognition.face_encodings(image, known_face_locations=locations)
+    def _downscale(self, image: RgbImage) -> tuple[RgbImage, float]:
+        """Shrink ``image`` so its longest edge is at most ``max_edge``.
 
-        return [
-            DetectedFace(
-                box=BoundingBox(top=t, right=r, bottom=b, left=lft),
-                embedding=np.asarray(embedding, dtype=np.float64),
-            )
-            for (t, r, b, lft), embedding in zip(locations, embeddings, strict=True)
-        ]
+        Detection cost grows with pixel count, so a phone photo can take
+        seconds while a webcam frame takes milliseconds. Capping the working
+        size makes the cost roughly constant regardless of what is uploaded.
+
+        Capping the longest edge is preferred over a fixed ratio: a fixed
+        ratio either leaves large images slow or shrinks small ones until
+        their faces vanish.
+
+        Returns the working image and the factor its coordinates must be
+        divided by to return to source scale.
+        """
+        height, width = image.shape[:2]
+        longest = max(height, width)
+
+        if self._max_edge <= 0 or longest <= self._max_edge:
+            return image, 1.0
+
+        scale = self._max_edge / longest
+        resized = cv2.resize(
+            image,
+            (round(width * scale), round(height * scale)),
+            # INTER_AREA is the right filter for shrinking; it avoids the
+            # aliasing that would cost detections.
+            interpolation=cv2.INTER_AREA,
+        )
+        return cast(RgbImage, resized), scale
 
     def encode_single(self, image: RgbImage) -> DetectedFace:
         """Describe the one face in ``image``, for enrolment.
@@ -126,3 +166,17 @@ class FaceEncoder:
             raise MultipleFacesError(f"Found {len(faces)} faces; enrolment requires exactly one.")
 
         return faces[0]
+
+
+def _to_box(location: tuple[int, int, int, int], scale: float) -> BoundingBox:
+    """Convert a dlib location back to source-image coordinates."""
+    top, right, bottom, left = location
+    if scale == 1.0:
+        return BoundingBox(top=top, right=right, bottom=bottom, left=left)
+
+    return BoundingBox(
+        top=round(top / scale),
+        right=round(right / scale),
+        bottom=round(bottom / scale),
+        left=round(left / scale),
+    )

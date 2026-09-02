@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     detection_model: DetectionModel = "hog"
     # Times to upsample before detecting. Higher finds smaller faces, costs time.
     detection_upsample: int = Field(default=1, ge=0, le=4)
+    # Images are shrunk so their longest edge is at most this, before
+    # detection. Detection cost scales with pixel count, so this bounds
+    # per-frame latency regardless of the camera or photo resolution.
+    detection_max_edge: int = Field(default=640, ge=0)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

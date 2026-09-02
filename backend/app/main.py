@@ -39,6 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.encoder = FaceEncoder(
         model=settings.detection_model,
         upsample=settings.detection_upsample,
+        max_edge=settings.detection_max_edge,
     )
     app.state.gallery = FaceGallery(settings.gallery_db_path)
     app.state.recognizer = Recognizer(
