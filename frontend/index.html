@@ -6,37 +6,77 @@
   <title>Face Recognition</title>
   <link rel="stylesheet" href="/static/css/styles.css" />
 </head>
-<body>
-  <main class="shell">
-    <header class="header">
-      <div class="mark" aria-hidden="true"></div>
-      <div>
-        <h1>Face Recognition</h1>
-        <p class="subtitle">Service status</p>
+<body data-camera-on="false">
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <h1>Face Recognition</h1>
+    </div>
+    <div class="status" aria-live="polite">
+      <span class="dot" id="status-dot" data-state="pending"></span>
+      <span id="status-text">Checking…</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stage" aria-label="Live recognition">
+      <div class="viewport">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+
+        <div class="placeholder" aria-hidden="true">
+          <p>Camera is off</p>
+          <p class="hint">Start the camera to recognise faces in real time.</p>
+        </div>
       </div>
-    </header>
 
-    <section class="card" aria-live="polite">
-      <div class="status">
-        <span class="dot" id="dot" data-state="pending"></span>
-        <span class="status-text" id="status-text">Checking…</span>
+      <div class="stage-bar">
+        <button class="btn primary" id="toggle-camera" type="button" data-active="false">
+          Start camera
+        </button>
+        <span class="meta" id="camera-state">Camera off</span>
+        <span class="meta spacer" id="fps">—</span>
+        <span class="meta" id="latency">—</span>
       </div>
 
-      <dl class="meta" id="meta" hidden>
-        <div><dt>Service</dt><dd id="meta-app">—</dd></div>
-        <div><dt>Version</dt><dd id="meta-version">—</dd></div>
-        <div><dt>Environment</dt><dd id="meta-env">—</dd></div>
-        <div><dt>Readiness</dt><dd id="meta-ready">—</dd></div>
-      </dl>
-
-      <button class="btn" id="refresh" type="button">Refresh</button>
+      <div class="results" id="results" aria-live="polite"></div>
     </section>
 
-    <footer class="footer">
-      <a href="/docs">API documentation</a>
-    </footer>
+    <aside class="panel">
+      <section class="card">
+        <h2>Enrol a face</h2>
+        <p class="hint">
+          One person per photo. Enrol only people who have agreed to it.
+        </p>
+
+        <label class="field">
+          <span>Name</span>
+          <input id="enrol-name" type="text" maxlength="64" placeholder="e.g. Nelay"
+                 autocomplete="off" spellcheck="false" />
+        </label>
+
+        <div class="actions">
+          <button class="btn primary" id="enrol-capture" type="button" disabled>
+            Capture from camera
+          </button>
+          <button class="btn" id="enrol-pick" type="button">Upload a photo</button>
+          <input id="enrol-file" type="file" accept="image/*" hidden />
+        </div>
+
+        <p class="feedback" id="feedback" role="status" hidden></p>
+      </section>
+
+      <section class="card">
+        <h2>Enrolled <span class="count" id="gallery-count">0</span></h2>
+        <ul class="gallery" id="gallery"></ul>
+      </section>
+    </aside>
   </main>
 
-  <script src="/static/js/app.js"></script>
+  <footer class="footer">
+    <a href="/docs">API documentation</a>
+  </footer>
+
+  <script type="module" src="/static/js/app.js"></script>
 </body>
 </html>
