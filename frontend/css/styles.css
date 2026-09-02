@@ -118,10 +118,15 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; }
   inset: 0;
   width: 100%;
   height: 100%;
+  /* Both are cover-fit at the same aspect ratio, so they crop identically
+     and overlay coordinates line up with what is on screen. */
   object-fit: cover;
-  /* Mirrored for a natural selfie view; overlay.js mirrors its drawing to match. */
-  transform: scaleX(-1);
 }
+
+/* Mirrored for a natural selfie view. The overlay is NOT flipped here —
+   overlay.js reflects the box coordinates instead, so the label text stays
+   readable. Flipping both reversed the glyphs and put boxes on the wrong side. */
+.viewport video { transform: scaleX(-1); }
 
 .viewport canvas { pointer-events: none; }
 

@@ -2,7 +2,7 @@
 
 import { ApiError, api } from "./api.js";
 import { Camera, describeCameraError } from "./camera.js";
-import { clearOverlay, drawFaces } from "./overlay.js";
+import { clearOverlay, drawFaces, resizeOverlay } from "./overlay.js";
 
 /** Floor between recognition requests. The loop is otherwise self-pacing:
  *  the next frame is only sent once the previous response has arrived, so a
@@ -71,9 +71,7 @@ async function toggleCamera() {
 }
 
 function sizeOverlay() {
-  const { width, height } = camera.captureSize;
-  ui.overlay.width = width;
-  ui.overlay.height = height;
+  resizeOverlay(ui.overlay, camera.captureSize);
 }
 
 function renderCameraState() {
@@ -299,6 +297,15 @@ ui.enrolFile.addEventListener("change", () => {
 });
 ui.name.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && camera.running) ui.enrolCapture.click();
+});
+
+// The stage is sized off the viewport height, so a window resize changes how
+// large the overlay is painted. Re-allocate it at the new density.
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  if (!camera.running) return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(sizeOverlay, 150);
 });
 
 // Release the camera when the tab is hidden rather than holding the device.
