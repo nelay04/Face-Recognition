@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -14,6 +16,27 @@ def _settings(**overrides: object) -> Settings:
 
 def test_cors_origins_accepts_comma_separated_string() -> None:
     settings = _settings(cors_origins="http://a.test, http://b.test")
+
+    assert settings.cors_origins == ["http://a.test", "http://b.test"]
+
+
+def test_cors_origins_parses_from_a_real_env_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression test: passing a value as an init kwarg (as above) skips
+    pydantic-settings' own env/dotenv parsing entirely, which is a different
+    code path from what a real deployment uses. This construction — reading
+    an actual .env file with no init kwargs — is what caught a startup crash
+    that every other test here missed: pydantic-settings tried to JSON-decode
+    the comma-separated string before `_split_origins` ever ran, and blew up
+    on a value as ordinary as ``CORS_ORIGINS=http://a,http://b``.
+    """
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text("CORS_ORIGINS=http://a.test,http://b.test\n")
+
+    settings = Settings(_env_file=env_file)  # type: ignore[call-arg]
 
     assert settings.cors_origins == ["http://a.test", "http://b.test"]
 
